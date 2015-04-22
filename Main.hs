@@ -8,6 +8,8 @@ import           Ivory.Language
 
 main :: IO ()
 main = C.compile $ pure $ package "foo" $ do
+  incl saw
+  incl rect
   incl jack_main
   defMemArea val
 
@@ -26,15 +28,30 @@ gcd' = proc "gcd_" $ \ a b -> body $ do
     ifte_ (a <=? b) (call gcd' b a) $ do
       call gcd' (a - b) b
 
-jack_main :: Def ('[] :-> IFloat)
-jack_main = proc "jack_ivory_main" $ body $ do
+rect :: Def ('[] :-> IFloat)
+rect = proc "rect" $ body $ do
   phase <- deref (addrOf val)
   let newPhase = (phase >=? 1) ? (phase - 1, phase)
       newPhase' = newPhase + inc
   store (addrOf val) newPhase'
   ret ((newPhase' <? 0.5) ? (- 1, 1) * 0.1)
 
-inc = 0.01
+saw :: Def ('[] :-> IFloat)
+saw = proc "saw" $ body $ do
+  phase <- deref (addrOf val)
+  let newPhase = (phase >=? 1) ? (phase - 1, phase)
+      newPhase' = newPhase + inc
+  store (addrOf val) newPhase'
+  ret (newPhase' * 0.1)
+
+jack_main :: Def ('[] :-> IFloat)
+jack_main = proc "jack_ivory_main" $ body $ do
+  a <- call rect
+  b <- call saw
+  ret (a + b)
+
+inc :: IFloat
+inc = 0.005
 
 val :: MemArea (Stored IFloat)
 val = area "val" (Just (ival 0))
