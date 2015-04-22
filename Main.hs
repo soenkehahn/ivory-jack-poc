@@ -1,57 +1,94 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TypeFamilies      #-}
+
+module Main (main) where
 
 import           Control.Applicative
+import           Control.Arrow
+import           Control.Monad.State.Lazy
 import qualified Ivory.Compile.C.CmdlineFrontend as C (compile)
 import           Ivory.Language
+import           Ivory.Language.Module
 
 main :: IO ()
-main = C.compile $ pure $ package "foo" $ do
-  incl saw
-  incl rect
-  incl jack_main
-  defMemArea val
+main = C.compile $ pure $ package "foo" $ runWithUniqueNames $ do
+  s <- saw
+  r <- rect
+  a <- add s r
+  return a
 
-printf :: Def ('[IString, Sint64] :-> ())
-printf = importProc "printf" "stdio.h"
+type M a = StateT (Integer, [Def ('[] :-> ())]) ModuleM a
 
-mainC :: Def ('[] :-> ())
-mainC  = proc "main" $ body $ do
-  x <- call gcd' 12 20
-  call_ printf "result: %i\n" x
-  retVoid
+runWithUniqueNames :: M (Signal IFloat) -> ModuleM ()
+runWithUniqueNames action = do
+  (outputSignal, (_counter, processors)) <- runStateT action (0, [])
+  jack_ivory_main processors outputSignal
 
-gcd' :: Def ('[Sint64, Sint64] :-> Sint64)
-gcd' = proc "gcd_" $ \ a b -> body $ do
-  ifte_ (a ==? b) (ret a) $ do
-    ifte_ (a <=? b) (call gcd' b a) $ do
-      call gcd' (a - b) b
+unique :: String -> M String
+unique pattern = do
+  (counter, processors) <- get
+  put (succ counter, processors)
+  return (pattern ++ "_" ++ show counter)
 
-rect :: Def ('[] :-> IFloat)
-rect = proc "rect" $ body $ do
-  phase <- deref (addrOf val)
-  let newPhase = (phase >=? 1) ? (phase - 1, phase)
-      newPhase' = newPhase + inc
-  store (addrOf val) newPhase'
-  ret ((newPhase' <? 0.5) ? (- 1, 1) * 0.1)
+addProcessor :: Def ('[] :-> ()) -> M ()
+addProcessor p =
+  modify (second (++ [p]))
 
-saw :: Def ('[] :-> IFloat)
-saw = proc "saw" $ body $ do
-  phase <- deref (addrOf val)
-  let newPhase = (phase >=? 1) ? (phase - 1, phase)
-      newPhase' = newPhase + inc
-  store (addrOf val) newPhase'
-  ret (newPhase' * 0.1)
+mkProcessor :: String
+  -> (Signal IFloat -> Body ())
+  -> M (Signal IFloat)
+mkProcessor pattern action = do
+  outputRefName <- unique (pattern ++ "_output")
+  let outputRef = area outputRefName (Just (ival 0))
 
-jack_main :: Def ('[] :-> IFloat)
-jack_main = proc "jack_ivory_main" $ body $ do
-  a <- call rect
-  b <- call saw
-  ret (a + b)
+  processorName <- unique (pattern ++ "_proc")
+  let processor = proc processorName $ action $ Signal $ addrOf outputRef
+  lift $ do
+    defMemArea outputRef
+    incl processor
+  addProcessor processor
+
+  return $ Signal $ addrOf outputRef
+
+mkState :: (MemArea (Stored IFloat) -> M a) -> M a
+mkState action = do
+  phaseRefName <- unique "rect_phase"
+  let phaseRef = area phaseRefName (Just (ival 0))
+  lift $ defMemArea phaseRef
+  action phaseRef
+
+jack_ivory_main :: [Def ('[] :-> ())] -> Signal IFloat -> ModuleM ()
+jack_ivory_main processors (Signal input) =
+  incl $ proc "jack_ivory_main" $ body $ do
+    mapM_ call_ processors
+    x <- deref input
+    ret x
+
+data Signal a = Signal (Ref Global (Stored a))
 
 inc :: IFloat
 inc = 0.005
 
-val :: MemArea (Stored IFloat)
-val = area "val" (Just (ival 0))
+rect :: M (Signal IFloat)
+rect = mkState $ \ phaseRef -> mkProcessor "rect" $ \ (Signal output) -> body $ do
+  phase <- deref (addrOf phaseRef)
+  let newPhase = (phase >=? 1) ? (phase - 1, phase)
+      newPhase' = newPhase + inc
+  store (addrOf phaseRef) newPhase'
+  store output ((newPhase' <? 0.5) ? (- 1, 1 :: IFloat) * 0.1)
+
+saw :: M (Signal IFloat)
+saw = mkState $ \ phaseRef -> mkProcessor "saw" $ \ (Signal output) -> body $ do
+  phase <- deref (addrOf phaseRef)
+  let newPhase = (phase >=? 1) ? (phase - 1, phase)
+      newPhase' = newPhase + inc
+  store (addrOf phaseRef) newPhase'
+  store output (newPhase' * 0.1)
+
+add :: Signal IFloat -> Signal IFloat -> M (Signal IFloat)
+add (Signal a) (Signal b) = mkProcessor "add" $ \ (Signal output) ->
+  body $ do
+    r <- (+) <$> deref a <*> deref b
+    store output r
