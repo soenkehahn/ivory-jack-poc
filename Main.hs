@@ -52,12 +52,12 @@ mkProcessor pattern action = do
 
   return $ Signal $ addrOf outputRef
 
-mkState :: (MemArea (Stored IFloat) -> M a) -> M a
+mkState :: (Ref Global (Stored IFloat) -> M a) -> M a
 mkState action = do
   phaseRefName <- unique "rect_phase"
   let phaseRef = area phaseRefName (Just (ival 0))
   lift $ defMemArea phaseRef
-  action phaseRef
+  action $ addrOf phaseRef
 
 jack_ivory_main :: [Def ('[] :-> ())] -> Signal IFloat -> ModuleM ()
 jack_ivory_main processors (Signal input) =
@@ -73,18 +73,18 @@ inc = 0.005
 
 rect :: M (Signal IFloat)
 rect = mkState $ \ phaseRef -> mkProcessor "rect" $ \ (Signal output) -> body $ do
-  phase <- deref (addrOf phaseRef)
+  phase <- deref phaseRef
   let newPhase = (phase >=? 1) ? (phase - 1, phase)
       newPhase' = newPhase + inc
-  store (addrOf phaseRef) newPhase'
+  store phaseRef newPhase'
   store output ((newPhase' <? 0.5) ? (- 1, 1 :: IFloat) * 0.1)
 
 saw :: M (Signal IFloat)
 saw = mkState $ \ phaseRef -> mkProcessor "saw" $ \ (Signal output) -> body $ do
-  phase <- deref (addrOf phaseRef)
+  phase <- deref phaseRef
   let newPhase = (phase >=? 1) ? (phase - 1, phase)
       newPhase' = newPhase + inc
-  store (addrOf phaseRef) newPhase'
+  store phaseRef newPhase'
   store output (newPhase' * 0.1)
 
 add :: Signal IFloat -> Signal IFloat -> M (Signal IFloat)
