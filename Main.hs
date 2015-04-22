@@ -14,10 +14,12 @@ import           Ivory.Language.Module
 
 main :: IO ()
 main = C.compile $ pure $ package "foo" $ runWithUniqueNames $ do
-  s <- saw
-  r <- rect
+  s <- saw 0.01
+  r <- rect 0.005
+  x <- rect 0.016
   a <- add s r
-  return a
+  b <- add a x
+  return b
 
 type M a = StateT (Integer, [Def ('[] :-> ())]) ModuleM a
 
@@ -68,19 +70,16 @@ jack_ivory_main processors (Signal input) =
 
 data Signal a = Signal (Ref Global (Stored a))
 
-inc :: IFloat
-inc = 0.005
-
-rect :: M (Signal IFloat)
-rect = mkState $ \ phaseRef -> mkProcessor "rect" $ \ (Signal output) -> body $ do
+rect :: IFloat -> M (Signal IFloat)
+rect inc = mkState $ \ phaseRef -> mkProcessor "rect" $ \ (Signal output) -> body $ do
   phase <- deref phaseRef
   let newPhase = (phase >=? 1) ? (phase - 1, phase)
       newPhase' = newPhase + inc
   store phaseRef newPhase'
   store output ((newPhase' <? 0.5) ? (- 1, 1 :: IFloat) * 0.1)
 
-saw :: M (Signal IFloat)
-saw = mkState $ \ phaseRef -> mkProcessor "saw" $ \ (Signal output) -> body $ do
+saw :: IFloat -> M (Signal IFloat)
+saw inc = mkState $ \ phaseRef -> mkProcessor "saw" $ \ (Signal output) -> body $ do
   phase <- deref phaseRef
   let newPhase = (phase >=? 1) ? (phase - 1, phase)
       newPhase' = newPhase + inc

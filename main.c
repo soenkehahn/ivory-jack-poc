@@ -24,7 +24,6 @@ int process (jack_nframes_t nframes, void *arg) {
 
 int main() {
   printf("starting...\n");
-  printf("result: %f\n", jack_ivory_main());
   if ((client = jack_client_open("foo", 0, 0)) == 0) {
     fprintf (stderr, "jack server not running?\n");
     return 1;
