@@ -13,3 +13,6 @@ foo.c: Main.hs
 
 main.o: main.c
 	gcc main.c -std=c99 -pedantic-errors -c -O11
+
+clean:
+	rm -rf a.out foo.* ivory.* ivory_asserts.h main.o
