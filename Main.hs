@@ -14,10 +14,9 @@ import           Ivory.Language.Module
 
 main :: IO ()
 main = C.compile $ pure $ package "foo" $ runWithUniqueNames $ do
-  lfo <- saw 0.00002
-  r <- rect lfo
-  x <- saw 0.016
-  a <- mix [r, x]
+  rs <- mapM (\ inc -> rect =<< saw inc) $
+    map (\ i -> 0.00002 * fromIntegral i) [1 .. 10 :: Integer]
+  a <- mix rs
   return a
 
 type M a = StateT (Integer, [Def ('[] :-> ())]) ModuleM a
