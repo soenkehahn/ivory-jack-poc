@@ -15,7 +15,7 @@ import           Ivory.Language.Module
 main :: IO ()
 main = C.compile $ pure $ package "foo" $ runWithUniqueNames $ do
   rs <- mapM (\ inc -> rect =<< saw inc) $
-    map (\ i -> 0.00002 * fromIntegral i) [1 .. 10 :: Integer]
+    map (\ i -> 0.00002 * fromIntegral i) [1 .. 200 :: Integer]
   a <- mix rs
   return a
 
@@ -75,7 +75,7 @@ rect (Signal inc) = mkState $ \ phaseRef -> mkProcessor "rect" $ \ (Signal outpu
   let newPhase = (phase >=? 1) ? (phase - 1, phase)
       newPhase' = newPhase + incV
   store phaseRef newPhase'
-  store output ((newPhase' <? 0.5) ? (- 1, 1 :: IFloat) * 0.1)
+  store output ((newPhase' <? 0.5) ? (- 1, 1 :: IFloat))
 
 saw :: IFloat -> M (Signal IFloat)
 saw inc = mkState $ \ phaseRef -> mkProcessor "saw" $ \ (Signal output) -> body $ do
@@ -101,7 +101,7 @@ mix signals = do
       mkProcessor "mix_inner" $ \ (Signal output) -> body $ do
         a' <- deref a
         b' <- deref b
-        store output (a' + b')
+        store output (a' + (b' / fromIntegral (length signals)))
 
     mkNeutral :: M (Signal IFloat)
     mkNeutral = mkProcessor "mix_neutral" $ \ (Signal output) -> body $ do
