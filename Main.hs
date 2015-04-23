@@ -15,7 +15,7 @@ import           Ivory.Language.Module
 main :: IO ()
 main = C.compile $ pure $ package "foo" $ runWithUniqueNames $ do
   rs <- mapM (\ inc -> rect =<< saw inc) $
-    map (\ i -> 0.00002 * fromIntegral i) [1 .. 50 :: Integer]
+    map (\ i -> 0.00002 * fromIntegral i) [1 .. 3 :: Integer]
   a <- mix rs
   return a
 

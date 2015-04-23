@@ -55,7 +55,7 @@ int main() {
     }
   }
 
-  sleep(1);
+  sleep(10);
   jack_client_close(client);
   return 0;
 }
