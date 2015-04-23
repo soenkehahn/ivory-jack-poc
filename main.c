@@ -51,7 +51,7 @@ int main() {
     fprintf(stderr, "Cannot find meterbridge\n");
   } else {
     if (jack_connect(client, jack_port_name (output_port), ports[0])) {
-      fprintf (stderr, "cannot connect output ports\n");
+      fprintf (stderr, "cannot connect meterbridge ports\n");
     }
   }
 

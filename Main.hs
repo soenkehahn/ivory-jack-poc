@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeOperators     #-}
 {-# LANGUAGE TypeFamilies      #-}
 
-module Main (main) where
+module Main (main, add) where
 
 import           Control.Applicative
 import           Control.Arrow
@@ -17,7 +17,7 @@ main = C.compile $ pure $ package "foo" $ runWithUniqueNames $ do
   lfo <- saw 0.00002
   r <- rect lfo
   x <- saw 0.016
-  a <- add r x
+  a <- mix [r, x]
   return a
 
 type M a = StateT (Integer, [Def ('[] :-> ())]) ModuleM a
@@ -91,3 +91,19 @@ add (Signal a) (Signal b) = mkProcessor "add" $ \ (Signal output) ->
   body $ do
     r <- (+) <$> deref a <*> deref b
     store output r
+
+mix :: [Signal IFloat] -> M (Signal IFloat)
+mix signals = do
+    neutral <- mkNeutral
+    foldM inner neutral signals
+  where
+    inner :: Signal IFloat -> Signal IFloat -> M (Signal IFloat)
+    inner (Signal a) (Signal b) =
+      mkProcessor "mix_inner" $ \ (Signal output) -> body $ do
+        a' <- deref a
+        b' <- deref b
+        store output (a' + b')
+
+    mkNeutral :: M (Signal IFloat)
+    mkNeutral = mkProcessor "mix_neutral" $ \ (Signal output) -> body $ do
+      store output 0
