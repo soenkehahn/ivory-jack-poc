@@ -16,8 +16,7 @@ main :: IO ()
 main = C.compile $ pure $ package "foo" $ runWithUniqueNames $ do
   rs <- mapM (\ inc -> rect =<< saw inc) $
     map (\ i -> 0.00002 * fromIntegral i) [1 .. 3 :: Integer]
-  a <- mix rs
-  return a
+  join (mult <$> constant 0.3 <*> mix rs)
 
 type M a = StateT (Integer, [Def ('[] :-> ())]) ModuleM a
 
@@ -36,9 +35,10 @@ addProcessor :: Def ('[] :-> ()) -> M ()
 addProcessor p =
   modify (second (++ [p]))
 
-mkProcessor :: String
-  -> (Signal IFloat -> Body ())
-  -> M (Signal IFloat)
+mkProcessor :: (IvoryInit a, Num a) =>
+     String
+  -> (Signal a -> Body ())
+  -> M (Signal a)
 mkProcessor pattern action = do
   outputRefName <- unique (pattern ++ "_output")
   let outputRef = area outputRefName (Just (ival 0))
@@ -98,3 +98,15 @@ mix signals = mkProcessor "mix" $ \ (Signal out) -> body $ do
   where
     len :: IFloat
     len = fromIntegral $ length signals
+
+constant :: (IvoryInit a, Num a, IvoryStore a) =>
+  a -> M (Signal a)
+constant c = mkProcessor "constant" $ \ (Signal out) -> body $ do
+  store out c
+
+mult :: (IvoryInit a, Num a, IvoryStore a) =>
+  Signal a -> Signal a -> M (Signal a)
+mult (Signal a) (Signal b) = mkProcessor "mult" $ \ (Signal out) -> body $ do
+  a' <- deref a
+  b' <- deref b
+  store out (a' * b')
