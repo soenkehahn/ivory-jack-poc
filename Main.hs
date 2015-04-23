@@ -14,7 +14,7 @@ import           Ivory.Language.Module
 
 main :: IO ()
 main = C.compile $ pure $ package "foo" $ runWithUniqueNames $ do
-  lfo <- saw 0.0001
+  lfo <- saw 0.00002
   r <- rect lfo
   x <- saw 0.016
   a <- add r x
