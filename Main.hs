@@ -14,9 +14,17 @@ import           Ivory.Language.Module
 
 main :: IO ()
 main = C.compile $ pure $ package "foo" $ runWithUniqueNames $ do
-  rs <- mapM (\ inc -> rect =<< saw inc) $
-    map (\ i -> 0.00002 * fromIntegral i) [1 .. 3 :: Integer]
-  join (mult <$> constant 0.3 <*> mix rs)
+  rs <- forM (map (\ i -> 0.00002 * fromIntegral i) [1 .. 3 :: Integer]) $
+    \ inc -> do
+      lfo <- join (mult <$> (saw inc) <*> (constant 0.1))
+      rect lfo
+  siren <- join (mult <$> constant 0.3 <*> mix rs)
+  bassdrum <- do
+    kick <- rect =<< constant 0.00002
+    ramp <- saw 0.000001
+    mult kick ramp
+  mix [siren, bassdrum, bassdrum]
+
 
 type M a = StateT (Integer, [Def ('[] :-> ())]) ModuleM a
 
@@ -83,7 +91,7 @@ saw inc = mkState $ \ phaseRef -> mkProcessor "saw" $ \ (Signal output) -> body 
   let newPhase = (phase >=? 1) ? (phase - 1, phase)
       newPhase' = newPhase + inc
   store phaseRef newPhase'
-  store output (newPhase' * 0.1)
+  store output newPhase'
 
 add :: Signal IFloat -> Signal IFloat -> M (Signal IFloat)
 add (Signal a) (Signal b) = mkProcessor "add" $ \ (Signal output) ->

@@ -1,4 +1,6 @@
 
+default: play
+
 play: a.out
 	./a.out
 
