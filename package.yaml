@@ -1,0 +1,12 @@
+name: ivory-jack-poc
+
+executables:
+  generate-foo:
+    main: Main.hs
+    source-dirs:
+      - src
+    dependencies:
+      - base
+      - mtl
+      - ivory
+      - ivory-backend-c
